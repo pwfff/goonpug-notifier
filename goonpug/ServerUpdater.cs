@@ -5,7 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 
-namespace goonpug
+namespace GoonPug
 {
     public delegate void ServerUpdateEventHandler(object sender, ServerUpdateEventArgs e);
 

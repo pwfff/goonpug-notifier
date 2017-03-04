@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace goonpug.Properties
+namespace GoonPug.Properties
 {
 
 

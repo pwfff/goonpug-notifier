@@ -6,15 +6,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace goonpug
+namespace GoonPug
 {
     class GoonPugApplicationContext : ApplicationContext
     {
         private NotifyIcon TrayIcon;
         private ContextMenuStrip TrayIconContextMenu;
         private ToolStripMenuItem CloseMenuItem;
-
-        private readonly SynchronizationContext synchronizationContext;
+        
         private readonly ServerUpdater serverUpdater;
 
         public GoonPugApplicationContext()
@@ -23,9 +22,7 @@ namespace goonpug
             serverUpdater.ServerUpdate += OnServerUpdate;
 
             Application.ApplicationExit += new EventHandler(OnApplicationExit);
-
-            synchronizationContext = SynchronizationContext.Current;
-
+            
             InitializeComponent();
 
             TrayIcon.Visible = true;
