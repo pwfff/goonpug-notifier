@@ -81,7 +81,9 @@ namespace goonpug
 
             TrayIconContextMenu.Items.Clear();
 
-            var menuItems = e.ServerInfos.Select(server => ServerToolStripMenuItem.GetToolStripMenuItem(server, new EventHandler(OnServerClick)));
+            var menuItems = e.ServerInfos.Select(
+                server => ServerToolStripMenuItem.GetToolStripMenuItem(server, new EventHandler(OnServerClick)
+            ));
             TrayIconContextMenu.Items.AddRange(menuItems.ToArray());
 
             TrayIconContextMenu.Items.Add(CloseMenuItem);
