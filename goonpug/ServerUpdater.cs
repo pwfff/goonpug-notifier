@@ -64,7 +64,6 @@ namespace goonpug
                     };
 
                     ServerUpdate(this, new ServerUpdateEventArgs(serverInfos, alert));
-                    Thread.Sleep(30000);
                 }
                 catch
                 {
@@ -77,6 +76,8 @@ namespace goonpug
                         false
                     ));
                 }
+
+                Thread.Sleep(30000);
             }
         }
         
