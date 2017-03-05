@@ -2,7 +2,6 @@
 using System;
 using System.Drawing;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -10,86 +9,102 @@ namespace GoonPug
 {
     class GoonPugApplicationContext : ApplicationContext
     {
-        private NotifyIcon TrayIcon;
-        private ContextMenuStrip TrayIconContextMenu;
-        private ToolStripMenuItem CloseMenuItem;
+        private NotifyIcon _trayIcon;
+        private ContextMenuStrip _trayIconContextMenu;
+        private ToolStripMenuItem _closeMenuItem;
         
         private readonly ServerUpdater serverUpdater;
+
+#if DEBUG
+        private const int AlertMinutes = 1;
+        private const int MinPlayers = 0;
+        private const int MaxPlayers = 999;
+#else
+        private const int AlertMinutes = 10;
+        private const int MinPlayers = 5;
+        private const int MaxPlayers = 11;
+#endif
+
+        private DateTime _lastAlert;
 
         public GoonPugApplicationContext()
         {
             serverUpdater = new ServerUpdater();
-            serverUpdater.ServerUpdate += OnServerUpdate;
 
             Application.ApplicationExit += new EventHandler(OnApplicationExit);
             
             InitializeComponent();
 
-            TrayIcon.Visible = true;
+            _trayIcon.Visible = true;
+
+            PollServers();
         }
 
         private void InitializeComponent()
         {
-            TrayIcon = new NotifyIcon();
+            _trayIcon = new NotifyIcon();
 
-            TrayIcon.BalloonTipIcon = ToolTipIcon.Info;
-            TrayIcon.Text = "sub.io Server Status";
+            _trayIcon.BalloonTipIcon = ToolTipIcon.Info;
+            _trayIcon.Text = "sub.io Server Status";
             
-            TrayIcon.Icon = Properties.Resources.TrayIcon;
+            _trayIcon.Icon = Properties.Resources.TrayIcon;
             
             //Optional - Add a context menu to the TrayIcon:
-            TrayIconContextMenu = new ContextMenuStrip();
-            CloseMenuItem = new ToolStripMenuItem();
-            TrayIconContextMenu.SuspendLayout();
+            _trayIconContextMenu = new ContextMenuStrip();
+            _closeMenuItem = new ToolStripMenuItem();
+            _trayIconContextMenu.SuspendLayout();
+            
+            _closeMenuItem.Name = "Close";
+            _closeMenuItem.Size = new Size(152, 22);
+            _closeMenuItem.Text = "Exit";
+            _closeMenuItem.Click += new EventHandler(CloseMenuItem_Click);
 
-            // 
-            // CloseMenuItem
-            // 
-            CloseMenuItem.Name = "Close";
-            CloseMenuItem.Size = new Size(152, 22);
-            CloseMenuItem.Text = "Exit";
-            CloseMenuItem.Click += new EventHandler(CloseMenuItem_Click);
-            // 
-            // TrayIconContextMenu
-            // 
-            TrayIconContextMenu.Items.AddRange(new ToolStripItem[] { CloseMenuItem });
-            TrayIconContextMenu.Name = "Server Statuses";
-            TrayIconContextMenu.Size = new Size(153, 70);
+            _trayIconContextMenu.Items.AddRange(new ToolStripItem[] { _closeMenuItem });
+            _trayIconContextMenu.Name = "Server Statuses";
+            _trayIconContextMenu.Size = new Size(153, 70);
 
-            TrayIconContextMenu.ResumeLayout(false);
-            TrayIcon.ContextMenuStrip = TrayIconContextMenu;
-
-            Task.Run(() => serverUpdater.PollServers());
+            _trayIconContextMenu.ResumeLayout(false);
+            _trayIcon.ContextMenuStrip = _trayIconContextMenu;
         }
 
-        private void OnServerUpdate(object sender, ServerUpdateEventArgs e)
+        public async Task PollServers()
         {
-            if (TrayIconContextMenu.InvokeRequired)
+            while (true)
             {
-                TrayIconContextMenu.Invoke(new Action<object, ServerUpdateEventArgs>(OnServerUpdate), sender, e);
-                return;
+                var pollTask = Task.Run(() => serverUpdater.PollServers());
+                var serverInfos = await pollTask;
+
+                if (serverInfos.Any(s => s.ServerNeedsPlayers(MinPlayers, MaxPlayers)) && NeedsAlert())
+                {
+                    _lastAlert = DateTime.UtcNow;
+                    var alertText = "goonman players needed!\n" + string.Join("\n", serverInfos.Select(s => s.Info()));
+                    _trayIcon.ShowBalloonTip(10000, "sub.io", alertText, ToolTipIcon.Warning);
+                }
+
+                _trayIconContextMenu.SuspendLayout();
+                _trayIconContextMenu.Items.Clear();
+
+                var menuItems = serverInfos.Select(
+                    server => ServerToolStripMenuItem.GetToolStripMenuItem(server, new EventHandler(OnServerClick)
+                ));
+                _trayIconContextMenu.Items.AddRange(menuItems.ToArray());
+
+                _trayIconContextMenu.Items.Add(_closeMenuItem);
+                _trayIconContextMenu.ResumeLayout(true);
+                
+                await Task.Delay(30000);
             }
-
-            if (e.SendAlert)
-            {
-                var alertText = "goonman players needed!\n" + string.Join("\n", e.ServerInfos.Select(s => s.Info()));
-                TrayIcon.ShowBalloonTip(10000, "sub.io", alertText, ToolTipIcon.Warning);
-            }
-
-            TrayIconContextMenu.Items.Clear();
-
-            var menuItems = e.ServerInfos.Select(
-                server => ServerToolStripMenuItem.GetToolStripMenuItem(server, new EventHandler(OnServerClick)
-            ));
-            TrayIconContextMenu.Items.AddRange(menuItems.ToArray());
-
-            TrayIconContextMenu.Items.Add(CloseMenuItem);
         }
 
+        private bool NeedsAlert()
+        {
+            return DateTime.UtcNow - _lastAlert > TimeSpan.FromMinutes(AlertMinutes);
+        }
+        
         private void OnApplicationExit(object sender, EventArgs e)
         {
             //Cleanup so that the icon will be removed when the application is closed
-            TrayIcon.Visible = false;
+            _trayIcon.Visible = false;
         }
         
         private void OnServerClick(object sender, EventArgs e)
@@ -133,6 +148,12 @@ namespace GoonPug
         public static string Info(this ServerInfo server)
         {
             return string.Format("{0}: {1}/{2}", server.Name, server.PlayerCount, server.MaxPlayers);
+        }
+
+        public static bool ServerNeedsPlayers(this ServerInfo server, int minPlayers, int maxPlayers)
+        {
+            var players = int.Parse(server.PlayerCount);
+            return players > minPlayers && players < maxPlayers;
         }
     }
 }
