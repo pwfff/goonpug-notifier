@@ -96,7 +96,7 @@ namespace GoonPug
         {
             var menuItem = (ServerToolStripMenuItem)sender;
             System.Diagnostics.Process.Start(
-                string.Format("steam://run/730//+connect {0}:{1}", ServerUpdater.Hostname, menuItem.server.Port)
+                string.Format("steam://connect/{0}:{1}", ServerUpdater.Hostname, menuItem.server.Port)
             );
         }
 
